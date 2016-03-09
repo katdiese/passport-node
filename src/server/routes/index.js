@@ -1,14 +1,14 @@
 var express = require('express');
 var router = express.Router();
 var pg = require('pg');
-var knex = require('knex');
-// var knexFunction = require('../../../db/knex');
-// function Users() {
-//   return knexFunction('users');
-// }
+var knex = require('../db/knex');
+var passport = require('../lib/auth')
 
 router.get('/', function(req, res, next) {
-  res.render('index', { greeting: 'Hello! Nice to see you.' });
+  console.log(req.user);
+  res.render('index', {
+    user: req.user
+  });
 });
 
 router.get('/login', function(req, res, next) {
@@ -18,15 +18,22 @@ router.get('/login', function(req, res, next) {
 });
 
 router.post('/login', function(req, res, next) {
-  var user = req.body;
-  res.render('login', {
-    title: 'Thanks for logging in.',
-    email: user.email,
-    password: user.password
-  })
+  passport.authenticate('local', function(err, user) {
+    if(err) {
+      return next(err);
+    } else {
+      req.logIn(user, function(err) {
+        if(err) {
+          return next(user);
+        }
+        return res.redirect('/')
+      })
+    }
+  })(req,res,next);
 });
 
-router.get('logout', function(req, res, next) {
+router.get('/logout', function(req, res, next) {
+  req.logout();
   res.redirect('/');
 });
 
@@ -37,12 +44,28 @@ router.get('/register', function(req, res, next) {
 });
 
 router.post('/register', function(req, res, next) {
-  var newUser = req.body;
-  res.render('register', {
-    title: 'Yay you registered!',
-    email: newUser.email,
-    password: newUser.password
+  var email = req.body.email;
+  var password = req.body.password;
+  knex('users').where('email', email)
+  .then(function(data) {
+    if(data.length) {
+      res.send('crap');
+    } else {
+      knex('users').insert({
+      email: email,
+      password: password
+    })
+    .then(function(data) {
+        return res.redirect('/login');
+      })
+    .catch(function(err) {
+      return res.send('crap');
+    })
+    }
   })
+  .catch(function(err) {
+    return next(err);
+  });
 });
 
 module.exports = router;

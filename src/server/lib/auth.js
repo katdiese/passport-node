@@ -1,49 +1,51 @@
 var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy
-var knex = require('../../db/knex.js');
-function Users() {
-  return knex('users');
-}
+var LocalStrategy = require('passport-local').Strategy;
+
+var knex = require('../db/knex');
+
 
 passport.use(new LocalStrategy({
-    email: 'email'
-},
-  function(username, password, done) {
-    var user = req.body;
-    Users().where('email', user.email).select()
+  usernameField: 'email'
+}, function(email, password, done) {
+    // does the email exist?
+    knex('users').where('email', email)
     .then(function(data) {
-      Users().where('password', data[0].password).andWhere('email', data[0].email).select()
+      // email does not exist. return error.
+      if (!data.length) {
+        return done('Incorrect email.');
+      }
+      var user = data[0];
+      // email found but do the passwords match?
+      if (password === user.password) {
+        // passwords match! return user
+        return done(null, user);
+      } else {
+        // passwords don't match! return error
+        return done('Incorrect password.');
+      }
     })
-    .then(function() {
-      res.render('/', {
-        Title: "You've successfully logged in!"
-      })
-    })
-
-      //does your user exist?
-        //yes? check password
-        //no? handle error
-      //check password
-        //correct?
-            //yes? return user info
-            //no? handle error
-
-      .catch(function() {
-      res.redirect('/login', {
-        message: 'Username or Password is incorrect.'
-      })
-    })
-    }
+    .catch(function(err) {
+      // issue with SQL/nex query
+      return done('Incorrect email and/or password.');
+    });
+  }
 ));
 
-//sets the user to 'req.user' and establishes a session via a cookie
+// sets the user to 'req.user' and establishes a session via a cookie
 passport.serializeUser(function(user, done) {
   done(null, user.id);
 });
 
-//used on subsequent requests to update 'req.user' and update session
+// used on subsequent requests to update 'req.user' and updates session
 passport.deserializeUser(function(id, done) {
-  User.findById(id, function (err, user) {
-    done(err, user);
+  knex('users').where('id', id)
+  .then(function(data) {
+    return done(null, data[0]);
+  })
+  .catch(function(err) {
+    return done(err);
   });
 });
+
+
+module.exports = passport;
